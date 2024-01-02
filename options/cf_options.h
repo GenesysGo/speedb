@@ -59,6 +59,8 @@ struct ImmutableCFOptions {
   int64_t max_write_buffer_size_to_maintain;
 
   bool inplace_update_support;
+  // TODO: make sure this is only enabled with leveled compaction
+  bool speedb_l0_compaction;
 
   UpdateStatus (*inplace_callback)(char* existing_value,
                                    uint32_t* existing_value_size,

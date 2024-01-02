@@ -280,8 +280,9 @@ bool CompactionPicker::RangeOverlapWithCompaction(
   // Did not overlap with any running compaction in level `level`
   return false;
 }
-
-bool CompactionPicker::FilesRangeOverlapWithCompaction(
+// checks if theres a current compaction whos output level is
+// output_level_ and its range overlaps with inputs range
+bool CompactionPicker::FilesRangeOverlapWithCompaction(  //
     const std::vector<CompactionInputFiles>& inputs, int level,
     int penultimate_level) const {
   bool is_empty = true;

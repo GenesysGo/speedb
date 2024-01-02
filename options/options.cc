@@ -66,6 +66,7 @@ AdvancedColumnFamilyOptions::AdvancedColumnFamilyOptions(const Options& options)
       max_write_buffer_size_to_maintain(
           options.max_write_buffer_size_to_maintain),
       inplace_update_support(options.inplace_update_support),
+      speedb_l0_compaction(options.speedb_l0_compaction),
       inplace_update_num_locks(options.inplace_update_num_locks),
       experimental_mempurge_threshold(options.experimental_mempurge_threshold),
       inplace_callback(options.inplace_callback),
@@ -395,6 +396,9 @@ void ColumnFamilyOptions::Dump(Logger* log) const {
     ROCKS_LOG_HEADER(log,
                      "                  Options.inplace_update_support: %d",
                      inplace_update_support);
+
+    ROCKS_LOG_HEADER(log, "                  Options.speedb_l0_compaction: %d",
+                     speedb_l0_compaction);
     ROCKS_LOG_HEADER(
         log,
         "                Options.inplace_update_num_locks: %" ROCKSDB_PRIszt,

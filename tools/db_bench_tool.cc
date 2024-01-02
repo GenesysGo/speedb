@@ -1651,6 +1651,10 @@ DEFINE_bool(inplace_update_support,
             ROCKSDB_NAMESPACE::Options().inplace_update_support,
             "Support in-place memtable update for smaller or same-size values");
 
+DEFINE_bool(speedb_l0_compaction,
+            ROCKSDB_NAMESPACE::Options().speedb_l0_compaction,
+            "Use Speedb L0 compaction flow");
+
 DEFINE_uint64(inplace_update_num_locks,
               ROCKSDB_NAMESPACE::Options().inplace_update_num_locks,
               "Number of RW locks to protect in-place memtable updates");
@@ -4982,6 +4986,7 @@ class Benchmark {
     options.enable_write_thread_adaptive_yield =
         FLAGS_enable_write_thread_adaptive_yield;
     options.use_dynamic_delay = FLAGS_use_dynamic_delay;
+    options.speedb_l0_compaction = FLAGS_speedb_l0_compaction;
     options.enable_pipelined_write = FLAGS_enable_pipelined_write;
     options.unordered_write = FLAGS_unordered_write;
     options.write_thread_max_yield_usec = FLAGS_write_thread_max_yield_usec;
