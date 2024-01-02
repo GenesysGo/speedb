@@ -603,6 +603,10 @@ static std::unordered_map<std::string, OptionTypeInfo>
          {offsetof(struct ImmutableCFOptions, inplace_update_support),
           OptionType::kBoolean, OptionVerificationType::kNormal,
           OptionTypeFlags::kNone}},
+        {"speedb_l0_compaction",
+         {offsetof(struct ImmutableCFOptions, speedb_l0_compaction),
+          OptionType::kBoolean, OptionVerificationType::kNormal,
+          OptionTypeFlags::kNone}},
         {"level_compaction_dynamic_level_bytes",
          {offsetof(struct ImmutableCFOptions,
                    level_compaction_dynamic_level_bytes),
@@ -958,6 +962,7 @@ ImmutableCFOptions::ImmutableCFOptions(const ColumnFamilyOptions& cf_options)
       max_write_buffer_size_to_maintain(
           cf_options.max_write_buffer_size_to_maintain),
       inplace_update_support(cf_options.inplace_update_support),
+      speedb_l0_compaction(cf_options.speedb_l0_compaction),
       inplace_callback(cf_options.inplace_callback),
       memtable_factory(cf_options.memtable_factory),
       table_factory(cf_options.table_factory),
