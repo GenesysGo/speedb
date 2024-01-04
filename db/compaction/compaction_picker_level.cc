@@ -763,9 +763,9 @@ bool LevelCompactionBuilder::TrySpeedbL0Selection() {
   assert(start_level_ == 0);
   // pick all L0 files.
   const std::vector<FileMetaData*>& level_files =
-      vstorage_->LevelFiles(start_level_);
+      vstorage_->LevelFiles(0 /* level */);
   // add all L0 files to inputs.
-  for (int i = 0; i < level_files.size(); i++) {
+  for (size_t i = 0; i < level_files.size(); i++) {
     auto* f = level_files[i];
     assert(f->being_compacted == false);
     start_level_inputs_.files.push_back(f);
@@ -790,9 +790,9 @@ bool LevelCompactionBuilder::TrySpeedbL0Selection() {
   // If L0L1 compaction results in over kMaxAllowedWrAmp Write Amp then schedule
   // Intra L0 compaction instead.
   // Theres a scenario where L1 size is very big will cause continuous intra L0
-  // compactions which will increase the size of L0 and then L1 consequently. To
-  // prevent such a scenario, we'll only run intra L0 compactions when:
-  // l0_size < 2 * max_bytes_for_level_base
+  // TODO: fix comment compactions which will increase the size of L0 and then
+  // L1 consequently. To prevent such a scenario, we'll only run intra L0
+  // compactions when: l0_size < 2 * max_bytes_for_level_base
   if ((l0_size < (l1_overlapped_size / kMaxAllowedWrAmp)) &&
       (l0_size < 2 * mutable_cf_options_.max_bytes_for_level_base)) {
     output_level_ = 0;
