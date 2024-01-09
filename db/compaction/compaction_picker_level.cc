@@ -213,8 +213,12 @@ void LevelCompactionBuilder::SetupInitialFiles() {
       } else {
         // didn't find the compaction, clear the inputs
         start_level_inputs_.clear();
-        if (start_level_ == 0 && !ioptions_.speedb_l0_compaction) {
+        if (start_level_ == 0) {
           skipped_l0_to_base = true;
+          // speedb intra L0 compactions are decided in TrySpeedbL0Selection.
+          if (ioptions_.speedb_l0_compaction) {
+            continue;
+          }
           // L0->base_level may be blocked due to ongoing L0->base_level
           // compactions. It may also be blocked by an ongoing compaction from
           // base_level downwards.
