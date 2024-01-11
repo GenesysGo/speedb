@@ -327,6 +327,18 @@ class VersionStorageInfo {
 
   void set_l0_delay_trigger_count(int v) { l0_delay_trigger_count_ = v; }
 
+  // In bytes per sec. same as delayed_write_rate
+  uint64_t l0_base_compaction_speed() const {
+    return lo_base_compaction_speed_;
+  }
+
+  //  TODO: check race.
+  // set in CompactionJob::Install
+  // also read and set in ColumnFamilyData::AutoTuneMaxRate
+  void set_l0_base_compaction_speed(uint64_t speed) {
+    lo_base_compaction_speed_ = speed;
+  }
+
   // REQUIRES: This version has been saved (see VersionBuilder::SaveTo)
   int NumLevelFiles(int level) const {
     assert(finalized_);
@@ -766,6 +778,9 @@ class VersionStorageInfo {
   // Used for computing bottommost files marked for compaction.
   SystemClock* clock_;
   uint32_t bottommost_file_compaction_delay_;
+
+  // Used for Speedb delay write rate auto tuning;
+  uint64_t lo_base_compaction_speed_ = 0;
 
   bool finalized_;
 

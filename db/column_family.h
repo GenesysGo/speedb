@@ -511,6 +511,10 @@ class ColumnFamilyData {
   void UpdateCFRate(void* client_id, uint64_t write_rate);
   void ResetCFRate(void* client_id);
 
+  void AutoTuneMaxRate();
+
+  void UpdateL0CompactionSpeed(void* client_id, uint64_t l0_compaction_speed);
+
   void DynamicSetupDelay(uint64_t max_write_rate,
                          uint64_t compaction_needed_bytes,
                          const MutableCFOptions& mutable_cf_options,
