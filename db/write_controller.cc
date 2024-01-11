@@ -150,6 +150,7 @@ void WriteController::HandleNewCompactionSpeedReq(
 // new min from all clients via GetMapMinRate()
 void WriteController::HandleNewDelayReq(void* client_id,
                                         uint64_t client_write_rate) {
+  client_write_rate = delayed_write_rate();
   assert(is_dynamic_delay());
   std::unique_lock<std::mutex> lock(map_mu_);
   bool was_min = IsMinRate(client_id);
