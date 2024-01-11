@@ -122,6 +122,27 @@ bool WriteController::IsInRateMap(void* client_id) {
   return id_to_write_rate_map_.count(client_id);
 }
 
+void WriteController::HandleNewCompactionSpeedReq(
+    void* client_id, uint64_t l0_compaction_speed) {
+  assert(is_dynamic_delay());
+  // TODO: introduce some boundaries.
+
+  // TODO: before i extend to the global case with many dbs and many cfs sharing
+  // the same WC, first test with just a single cf. so just set the
+  // max_delayed_write_rate. This sets both delayed_write_rate_ and
+  // max_delayed_write_rate_
+  (void)(client_id);
+  set_delayed_write_rate(l0_compaction_speed);
+  {
+    std::lock_guard<std::mutex> logger_lock(loggers_map_mu_);
+    for (auto& logger_and_clients : loggers_to_client_ids_map_) {
+      ROCKS_LOG_WARN(logger_and_clients.first.get(),
+                     "WC setting max delay rate of %" PRIu64 ", client_id: %p ",
+                     l0_compaction_speed, client_id);
+    }
+  }
+}
+
 // The usual case is to set the write_rate of this client (cf, write buffer
 // manager) only if its lower than the current min (delayed_write_rate_) but
 // theres also the case where this client was the min rate (was_min) and now
