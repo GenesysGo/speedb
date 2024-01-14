@@ -888,6 +888,18 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
   auto vstorage = cfd->current()->storage_info();
   const auto& stats = compaction_stats_.stats;
 
+  // Add the speed of L0L1 compaction for auto tuning delay rate.
+  if (output_level == vstorage->base_level() && stats.micros > 0) {
+    if (compact_->compaction->immutable_options()->compaction_style ==
+        kCompactionStyleLevel) {
+      assert(compact_->compaction->start_level() == 0);
+      constexpr int micros_in_sec = 1000000;
+      uint64_t compaction_speed_bytes_per_sec =
+          (stats.bytes_read_non_output_levels / stats.micros) * micros_in_sec;
+      cfd->set_l0_base_compaction_speed(compaction_speed_bytes_per_sec);
+    }
+  }
+
   double read_write_amp = 0.0;
   double write_amp = 0.0;
   double bytes_read_per_sec = 0;

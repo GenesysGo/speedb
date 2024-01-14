@@ -900,6 +900,38 @@ int GetL0ThresholdSpeedupCompaction(int level0_file_num_compaction_trigger,
 }
 }  // anonymous namespace
 
+void ColumnFamilyData::AutoTuneMaxRate() {
+  auto* vstorage = current_->storage_info();
+  // auto l0_running_compactions =
+  //     compaction_picker()->level0_compactions_in_progress();
+
+  // calc how much longer the L0-L1 will take.  by its input size and the rate
+  // of the previous compaction. also adjust start time is different than here
+  // set the delay rate to be such that L0 will only grow its current size. e.g.
+  // if there are 12 L0 files atm and the compaction will take another 4 secs
+  // then set the delay rate to be 3 files per sec. calc delay rate to be:
+  // current l0 size / time for the L0L1 compaction to finish.
+
+  auto l0_compaction_speed = l0_base_compaction_speed();
+  // whenever a L0L1 compaction finishes, it updates l0_compaction_speed.
+  if (l0_compaction_speed > 0) {
+    // then we've had an L0L1 compaction and we need to update the rate.
+    // The ratio of how much L0 has grown during last L0 compaction indicates
+    // how the rate should be adjusted.
+    // TODO: check if this counts currently compacting files.
+    // auto cur_l0_size = vstorage->NumLevelBytes(0);
+    // auto prev_l0_size = vstorage->prev_l0_size_;
+    // prev_l0_size = prev_l0_size > 0 ? prev_l0_size : cur_l0_size;
+    // double ratio = (cur_l0_size - prev_l0_size) / prev_l0_size;
+    // double time_for_pending
+    // prev_l0_size;
+    UpdateL0CompactionSpeed(this, l0_compaction_speed);
+  }
+
+  // reset speed since we've sent it to the write controller.
+  // vstorage->set_l0_base_compaction_speed(0);
+}
+
 namespace {
 const int kMemtablePenalty = 10;
 const int kNumPendingSteps = 100;
@@ -926,6 +958,11 @@ void ColumnFamilyData::DynamicSetupDelay(
     write_rate = WriteController::kMinWriteRate;
   }
 
+  auto l0_compaction_speed = l0_base_compaction_speed();
+  // whenever a L0L1 compaction finishes, it updates l0_compaction_speed.
+  if (l0_compaction_speed > 0) {
+    write_rate = l0_compaction_speed;
+  }
   UpdateCFRate(this, write_rate);
 }
 
@@ -1063,6 +1100,13 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     bool was_stopped = write_controller->IsStopped();
     bool needed_delay = write_controller->NeedsDelay();
     bool dynamic_delay = write_controller->is_dynamic_delay();
+
+    // Set the max delayed write rate based on L0 clearance rate.
+    // For a global write controller, theres a list of all max delay rate
+    // requests and it applies the lowest.
+    if (dynamic_delay) {
+      AutoTuneMaxRate();
+    }
 
     // GetWriteStallConditionAndCause returns the first condition met, so its
     // possible that a later condition will require a harder rate limiting.
@@ -1884,6 +1928,14 @@ ColumnFamilyData* ColumnFamilySet::CreateColumnFamily(
     default_cfd_cache_ = new_cfd;
   }
   return new_cfd;
+}
+
+void ColumnFamilyData::UpdateL0CompactionSpeed(void* client_id,
+                                               uint64_t l0_compaction_speed) {
+  if (write_controller_ && write_controller_->is_dynamic_delay()) {
+    write_controller_->HandleNewCompactionSpeedReq(client_id,
+                                                   l0_compaction_speed);
+  }
 }
 
 void ColumnFamilyData::UpdateCFRate(void* client_id, uint64_t write_rate) {

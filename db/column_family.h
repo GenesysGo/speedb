@@ -507,9 +507,31 @@ class ColumnFamilyData {
 
   VersionStorageInfo* TEST_GetCurrentStorageInfo();
 
+  // TODO: fix methods and placement.
+  uint64_t prev_l0_size_ = 0;
+
+  // In bytes per sec. same as delayed_write_rate
+  uint64_t l0_base_compaction_speed() const {
+    return lo_base_compaction_speed_;
+  }
+
+  //  TODO: check race.
+  // set in CompactionJob::Install
+  // also read and set in ColumnFamilyData::AutoTuneMaxRate
+  void set_l0_base_compaction_speed(uint64_t speed) {
+    lo_base_compaction_speed_ = speed;
+  }
+
  private:
+  // Used for Speedb delay write rate auto tuning;
+  std::atomic<uint64_t> lo_base_compaction_speed_ = 0;
+
   void UpdateCFRate(void* client_id, uint64_t write_rate);
   void ResetCFRate(void* client_id);
+
+  void AutoTuneMaxRate();
+
+  void UpdateL0CompactionSpeed(void* client_id, uint64_t l0_compaction_speed);
 
   void DynamicSetupDelay(uint64_t max_write_rate,
                          uint64_t compaction_needed_bytes,

@@ -147,6 +147,9 @@ class WriteController {
   void WaitOnCV(std::function<bool()> continue_wait);
   void NotifyCV();
 
+  void HandleNewCompactionSpeedReq(void* client_id,
+                                   uint64_t l0_compaction_speed);
+
  private:
   bool IsMinRate(void* client_id);
   bool IsInRateMap(void* client_id);
