@@ -901,7 +901,7 @@ int GetL0ThresholdSpeedupCompaction(int level0_file_num_compaction_trigger,
 }  // anonymous namespace
 
 void ColumnFamilyData::AutoTuneMaxRate() {
-  auto* vstorage = current_->storage_info();
+  // auto* vstorage = current_->storage_info();
   // auto l0_running_compactions =
   //     compaction_picker()->level0_compactions_in_progress();
 
