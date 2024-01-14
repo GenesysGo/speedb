@@ -1089,9 +1089,9 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     // write_stall_cause. this is only relevant in the kDelayed case.
     if (dynamic_delay) {
       if (write_stall_condition == WriteStallCondition::kDelayed) {
-        DynamicSetupDelay(write_controller->max_delayed_write_rate(),
-                          compaction_needed_bytes, mutable_cf_options,
-                          write_stall_cause);
+        // DynamicSetupDelay(write_controller->max_delayed_write_rate(),
+        //                   compaction_needed_bytes, mutable_cf_options,
+        //                   write_stall_cause);
         write_controller_token_.reset();
       } else {
         write_controller->HandleRemoveDelayReq(this);
