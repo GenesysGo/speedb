@@ -909,7 +909,7 @@ void ColumnFamilyData::AutoTuneMaxRate() {
   }
 
   // reset speed since we've sent it to the write controller.
-  vstorage->set_l0_base_compaction_speed(0);
+  // vstorage->set_l0_base_compaction_speed(0);
 }
 
 namespace {
@@ -938,6 +938,12 @@ void ColumnFamilyData::DynamicSetupDelay(
     write_rate = WriteController::kMinWriteRate;
   }
 
+  auto* vstorage = current_->storage_info();
+  auto l0_compaction_speed = vstorage->l0_base_compaction_speed();
+  // whenever a L0L1 compaction finishes, it updates l0_compaction_speed.
+  if (l0_compaction_speed > 0) {
+    write_rate = l0_compaction_speed;
+  }
   UpdateCFRate(this, write_rate);
 }
 
@@ -1089,9 +1095,9 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     // write_stall_cause. this is only relevant in the kDelayed case.
     if (dynamic_delay) {
       if (write_stall_condition == WriteStallCondition::kDelayed) {
-        // DynamicSetupDelay(write_controller->max_delayed_write_rate(),
-        //                   compaction_needed_bytes, mutable_cf_options,
-        //                   write_stall_cause);
+        DynamicSetupDelay(write_controller->max_delayed_write_rate(),
+                          compaction_needed_bytes, mutable_cf_options,
+                          write_stall_cause);
         write_controller_token_.reset();
       } else {
         write_controller->HandleRemoveDelayReq(this);

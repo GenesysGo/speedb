@@ -132,7 +132,7 @@ void WriteController::HandleNewCompactionSpeedReq(
   // max_delayed_write_rate. This sets both delayed_write_rate_ and
   // max_delayed_write_rate_
   (void)(client_id);
-  set_delayed_write_rate(l0_compaction_speed);
+  // set_delayed_write_rate(l0_compaction_speed);
   {
     std::lock_guard<std::mutex> logger_lock(loggers_map_mu_);
     for (auto& logger_and_clients : loggers_to_client_ids_map_) {
