@@ -905,7 +905,7 @@ namespace {
 const int kMemtablePenalty = 10;
 const int kNumPendingSteps = 100;
 const double kExtraDelay = 0.9;
-const double kGoalMbs = 5;
+const double kGoalMbs = 5242880.0;
 }  // namespace
 
 double ColumnFamilyData::TEST_CalculateWriteDelayDivider(
@@ -1083,12 +1083,12 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
     const auto num_L0_steps = stop - file_to_start_delay;
     assert(num_L0_steps > 0);
     double num_steps = num_L0_steps > 6 ? num_L0_steps - 3 : num_L0_steps;
-    uint64_t l0_compaction_speed = l0_base_compaction_speed();
-    auto delay_percent = pow((kGoalMbs / l0_compaction_speed), 1 / num_steps);
+    double delay_percent =
+        std::pow((kGoalMbs / l0_base_compaction_speed()), 1.0 / num_steps);
     // since extra_l0_ssts == num_L0_steps then we're in a stop condition.
     assert(extra_l0_ssts < num_L0_steps);
 
-    l0_divider = 1 / (pow(delay_percent, extra_l0_ssts));
+    l0_divider = 1 / (std::pow(delay_percent, extra_l0_ssts));
   }
 
   if (l0_divider > biggest_divider) {
