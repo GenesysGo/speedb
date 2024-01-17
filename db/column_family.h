@@ -523,7 +523,9 @@ class ColumnFamilyData {
 
  private:
   // Used for Speedb delay write rate auto tuning;
-  std::atomic<uint64_t> lo_base_compaction_speed_ = 0;
+  // Init with rate of 200Mb to help with delay until the first L0L1 compaction
+  // finishes.
+  std::atomic<uint64_t> lo_base_compaction_speed_ = 209715200;
 
   void UpdateCFRate(void* client_id, uint64_t write_rate);
   void ResetCFRate(void* client_id);

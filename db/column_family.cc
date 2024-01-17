@@ -920,15 +920,14 @@ void ColumnFamilyData::DynamicSetupDelay(
     uint64_t max_write_rate, uint64_t compaction_needed_bytes,
     const MutableCFOptions& mutable_cf_options,
     WriteStallCause& write_stall_cause) {
-  auto adjusted_l0_compaction_speed = l0_base_compaction_speed() * kExtraDelay;
-  auto delay_rate = adjusted_l0_compaction_speed > 0
-                        ? adjusted_l0_compaction_speed
-                        : max_write_rate;
+  auto adjusted_l0_compaction_speed = max_write_rate * kExtraDelay;
+  assert(adjusted_l0_compaction_speed > 0);
   const double rate_divider =
       CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
           compaction_needed_bytes, mutable_cf_options, write_stall_cause);
   assert(rate_divider >= 1);
-  auto write_rate = static_cast<uint64_t>(delay_rate / rate_divider);
+  auto write_rate =
+      static_cast<uint64_t>(adjusted_l0_compaction_speed / rate_divider);
   if (write_rate < WriteController::kMinWriteRate) {
     write_rate = WriteController::kMinWriteRate;
   }
@@ -1083,6 +1082,7 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
     double delay_percent =
         std::pow((kGoalMbs / l0_base_compaction_speed()), 1.0 / num_steps);
     // since extra_l0_ssts == num_L0_steps then we're in a stop condition.
+    assert(delay_percent > 0 && delay_percent < 1);
     assert(extra_l0_ssts < num_L0_steps);
 
     l0_divider = 1 / (std::pow(delay_percent, extra_l0_ssts));
