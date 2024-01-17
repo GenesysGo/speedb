@@ -902,9 +902,9 @@ int GetL0ThresholdSpeedupCompaction(int level0_file_num_compaction_trigger,
 }  // anonymous namespace
 
 namespace {
-const int kMemtablePenalty = 10;
+const int kMemtablePenalty = 5;
 const int kNumPendingSteps = 100;
-const double kExtraDelay = 0.9;
+const double kExtraDelay = 1;
 const double kGoalMbs = 5242880.0;
 }  // namespace
 
