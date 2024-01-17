@@ -147,6 +147,10 @@ void WriteController::HandleNewDelayReq(void* client_id,
   set_delayed_write_rate(min_rate);
   lock.unlock();
 
+  if (loggers_to_client_ids_map_.size() == 1) {
+    return;
+  }
+
   {
     std::lock_guard<std::mutex> logger_lock(loggers_map_mu_);
     for (auto& logger_and_clients : loggers_to_client_ids_map_) {
