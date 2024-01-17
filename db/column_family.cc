@@ -1018,6 +1018,7 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
         1 / (1 - (static_cast<double>(step_num) / kNumPendingSteps));
   }
 
+  pending_divider = 1;
   double biggest_divider = 1;
   if (memtable_divider > pending_divider) {
     biggest_divider = memtable_divider;
@@ -1050,10 +1051,6 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
   // heavily delay the rest of the files. In any case, delay at least 2 *
   // trigger.
 
-  // if (vstorage->l0_delay_trigger_count() ==
-  //     mutable_cf_options.level0_slowdown_writes_trigger) {
-  // }
-  // slowdown 12 ; stop 20; - start at 12
   // slowdown 12 ; stop 30; - start at 22
   // slowdown 12 ; stop 50; - start at 24
   // slowdown 12 ; stop 16; start at 12
