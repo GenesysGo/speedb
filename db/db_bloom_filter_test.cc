@@ -1,3 +1,17 @@
+// Copyright (C) 2023 Speedb Ltd. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
 //  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 //  This source code is licensed under both the GPLv2 (found in the
 //  COPYING file in the root directory) and Apache 2.0 License
@@ -31,11 +45,6 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-namespace {
-std::shared_ptr<const FilterPolicy> Create(double bits_per_key,
-                                           const std::string& name) {
-  return BloomLikeFilterPolicy::Create(name, bits_per_key);
-}
 const std::string kLegacyBloom = test::LegacyBloomFilterPolicy::kClassName();
 const std::string kFastLocalBloom =
     test::FastLocalBloomFilterPolicy::kClassName();
@@ -43,6 +52,32 @@ const std::string kStandard128Ribbon =
     test::Standard128RibbonFilterPolicy::kClassName();
 const std::string kAutoBloom = BloomFilterPolicy::kClassName();
 const std::string kAutoRibbon = RibbonFilterPolicy::kClassName();
+const std::string kSpeedbPairedBloomFilter = "speedb.PairedBloomFilter";
+
+namespace {
+
+std::vector<std::string> GetAllFixedImpls() {
+  std::vector<std::string> impls = BloomLikeFilterPolicy::GetAllFixedImpls();
+  impls.push_back(kSpeedbPairedBloomFilter);
+  return impls;
+}
+
+std::shared_ptr<const FilterPolicy> Create(double bits_per_key,
+                                           const std::string& name) {
+  if (name != kSpeedbPairedBloomFilter) {
+    return BloomLikeFilterPolicy::Create(name, bits_per_key);
+  } else {
+    ConfigOptions config_options;
+    config_options.ignore_unsupported_options = false;
+    std::shared_ptr<const FilterPolicy> filter_policy;
+    Status s = FilterPolicy::CreateFromString(
+        config_options,
+        kSpeedbPairedBloomFilter + ":" + std::to_string(bits_per_key),
+        &filter_policy);
+    assert(s.ok() && (filter_policy != nullptr));
+    return filter_policy;
+  }
+}
 
 template <typename T>
 T Pop(T& var) {
@@ -594,8 +629,13 @@ TEST_P(DBBloomFilterTestWithParam, BloomFilter) {
         handles_[1], DB::Properties::kAggregatedTableProperties, &props));
     uint64_t nkeys = N + N / 100;
     uint64_t filter_size = ParseUint64(props["filter_size"]);
-    EXPECT_LE(filter_size,
-              (partition_filters_ ? 12 : 11) * nkeys / /*bits / byte*/ 8);
+    // The space per Speedb Paired-Bloom-Filter is calculated differently and
+    // has a minimum size of 2048 bytes per filter - Skipping this validation
+    // for these filters
+    if (bfp_impl_ != kSpeedbPairedBloomFilter) {
+      EXPECT_LE(filter_size,
+                (partition_filters_ ? 12 : 11) * nkeys / /*bits / byte*/ 8);
+    }
     if (bfp_impl_ == kAutoRibbon) {
       // Sometimes using Ribbon filter which is more space-efficient
       EXPECT_GE(filter_size, 7 * nkeys / /*bits / byte*/ 8);
@@ -762,20 +802,25 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::Values(
         std::make_tuple(kAutoBloom, true, test::kDefaultFormatVersion),
         std::make_tuple(kAutoBloom, false, test::kDefaultFormatVersion),
-        std::make_tuple(kAutoRibbon, false, test::kDefaultFormatVersion)));
+        std::make_tuple(kAutoRibbon, false, test::kDefaultFormatVersion),
+        std::make_tuple(kSpeedbPairedBloomFilter, false,
+                        test::kDefaultFormatVersion)));
 
 INSTANTIATE_TEST_CASE_P(
     FormatDef, DBBloomFilterTestWithParam,
     ::testing::Values(
         std::make_tuple(kAutoBloom, true, test::kDefaultFormatVersion),
         std::make_tuple(kAutoBloom, false, test::kDefaultFormatVersion),
-        std::make_tuple(kAutoRibbon, false, test::kDefaultFormatVersion)));
+        std::make_tuple(kAutoRibbon, false, test::kDefaultFormatVersion),
+        std::make_tuple(kSpeedbPairedBloomFilter, false,
+                        test::kDefaultFormatVersion)));
 
 INSTANTIATE_TEST_CASE_P(
     FormatLatest, DBBloomFilterTestWithParam,
     ::testing::Values(std::make_tuple(kAutoBloom, true, kLatestFormatVersion),
                       std::make_tuple(kAutoBloom, false, kLatestFormatVersion),
-                      std::make_tuple(kAutoRibbon, false,
+                      std::make_tuple(kAutoRibbon, false, kLatestFormatVersion),
+                      std::make_tuple(kSpeedbPairedBloomFilter, false,
                                       kLatestFormatVersion)));
 #endif  // !defined(ROCKSDB_VALGRIND_RUN) || defined(ROCKSDB_FULL_VALGRIND_RUN)
 
@@ -1036,7 +1081,16 @@ INSTANTIATE_TEST_CASE_P(
                         kStandard128Ribbon, true, true),
 
         std::make_tuple(CacheEntryRoleOptions::Decision::kEnabled, kLegacyBloom,
-                        false, false)));
+                        false, false),
+
+        std::make_tuple(CacheEntryRoleOptions::Decision::kDisabled,
+                        kSpeedbPairedBloomFilter, false, false),
+        std::make_tuple(CacheEntryRoleOptions::Decision::kEnabled,
+                        kSpeedbPairedBloomFilter, false, false),
+        std::make_tuple(CacheEntryRoleOptions::Decision::kEnabled,
+                        kSpeedbPairedBloomFilter, true, false),
+        std::make_tuple(CacheEntryRoleOptions::Decision::kEnabled,
+                        kSpeedbPairedBloomFilter, true, true)));
 
 // TODO: Speed up this test, and reduce disk space usage (~700MB)
 // The current test inserts many keys (on the scale of dummy entry size)
@@ -1418,7 +1472,9 @@ INSTANTIATE_TEST_CASE_P(
                       std::make_tuple(true, kFastLocalBloom, false),
                       std::make_tuple(true, kFastLocalBloom, true),
                       std::make_tuple(true, kStandard128Ribbon, false),
-                      std::make_tuple(true, kStandard128Ribbon, true)));
+                      std::make_tuple(true, kStandard128Ribbon, true),
+                      std::make_tuple(true, kSpeedbPairedBloomFilter, false),
+                      std::make_tuple(true, kSpeedbPairedBloomFilter, true)));
 
 TEST_P(DBFilterConstructionCorruptionTestWithParam, DetectCorruption) {
   Options options = CurrentOptions();
@@ -2342,7 +2398,8 @@ INSTANTIATE_TEST_CASE_P(
                       std::make_tuple(kLegacyBloom, true),
                       std::make_tuple(kFastLocalBloom, false),
                       std::make_tuple(kFastLocalBloom, true),
-                      std::make_tuple(kPlainTable, false)));
+                      std::make_tuple(kPlainTable, false),
+                      std::make_tuple(kSpeedbPairedBloomFilter, false)));
 
 namespace {
 void PrefixScanInit(DBBloomFilterTest* dbtest) {
@@ -2659,7 +2716,7 @@ int CountIter(std::unique_ptr<Iterator>& iter, const Slice& key) {
 // into the same string, or 2) the transformed seek key is of the same length
 // as the upper bound and two keys are adjacent according to the comparator.
 TEST_F(DBBloomFilterTest, DynamicBloomFilterUpperBound) {
-  for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
+  for (const auto& bfp_impl : GetAllFixedImpls()) {
     Options options;
     options.create_if_missing = true;
     options.env = CurrentOptions().env;
@@ -2830,7 +2887,7 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterUpperBound) {
 // Create multiple SST files each with a different prefix_extractor config,
 // verify iterators can read all SST files using the latest config.
 TEST_F(DBBloomFilterTest, DynamicBloomFilterMultipleSST) {
-  for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
+  for (const auto& bfp_impl : GetAllFixedImpls()) {
     Options options;
     options.env = CurrentOptions().env;
     options.create_if_missing = true;
@@ -2957,7 +3014,7 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterMultipleSST) {
 // as expected
 TEST_F(DBBloomFilterTest, DynamicBloomFilterNewColumnFamily) {
   int iteration = 0;
-  for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
+  for (const auto& bfp_impl : GetAllFixedImpls()) {
     Options options = CurrentOptions();
     options.create_if_missing = true;
     options.prefix_extractor.reset(NewFixedPrefixTransform(1));
@@ -3013,7 +3070,7 @@ TEST_F(DBBloomFilterTest, DynamicBloomFilterNewColumnFamily) {
 // Verify it's possible to change prefix_extractor at runtime and iterators
 // behaves as expected
 TEST_F(DBBloomFilterTest, DynamicBloomFilterOptions) {
-  for (const auto& bfp_impl : BloomLikeFilterPolicy::GetAllFixedImpls()) {
+  for (const auto& bfp_impl : GetAllFixedImpls()) {
     Options options;
     options.env = CurrentOptions().env;
     options.create_if_missing = true;

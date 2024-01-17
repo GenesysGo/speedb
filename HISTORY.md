@@ -13,6 +13,7 @@ Based on RocksDB 8.6.7
 * Enabled speedb features in C and Java (#722)
 * stress test: Add the ability to trace write operations. Controlled by flag trace_ops (on by default). Trace files will be written to the expected values dir.
 * LOG Enhancement: Have a separate LOG entry per CF Stats. This ensures that no CF stats data is lost in case the size of the combined CF stats text exceeds the LOG's threshold (#534).
+* Support Speedb's paired bloom filter in the existing db_bloom_filter_test suite and delete the (no longer needed) speedb_db_bloom_filter_test suite (#809).
 
 ### Bug Fixes
 * fix conflicts between db_bench flags and enable speedb features flag(#743).
