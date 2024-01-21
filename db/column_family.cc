@@ -931,7 +931,7 @@ void ColumnFamilyData::DynamicSetupDelay(
   if (write_rate < WriteController::kMinWriteRate) {
     write_rate = WriteController::kMinWriteRate;
   }
-
+  write_rate = max_write_rate;
   UpdateCFRate(this, write_rate);
 }
 
@@ -1120,15 +1120,18 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     // possible that a later condition will require a harder rate limiting.
     // calculate all conditions with DynamicSetupDelay and reevaluate the
     // write_stall_cause. this is only relevant in the kDelayed case.
+    write_stall_condition = WriteStallCondition::kDelayed;
     if (dynamic_delay) {
       if (write_stall_condition == WriteStallCondition::kDelayed) {
-        DynamicSetupDelay(l0_base_compaction_speed(), compaction_needed_bytes,
-                          mutable_cf_options, write_stall_cause);
+        DynamicSetupDelay(write_controller->max_delayed_write_rate(),
+                          compaction_needed_bytes, mutable_cf_options,
+                          write_stall_cause);
         write_controller_token_.reset();
       } else {
         write_controller->HandleRemoveDelayReq(this);
       }
     }
+    write_stall_condition = WriteStallCondition::kDelayed;
 
     if (write_stall_condition == WriteStallCondition::kStopped &&
         write_stall_cause == WriteStallCause::kMemtableLimit) {
