@@ -2760,6 +2760,11 @@ void StressTest::Open(SharedState* shared) {
     exit(1);
   }
 
+  if (FLAGS_use_txn && FLAGS_trace_ops) {
+    fprintf(stderr, "use_txn is currently incompatible with trace_ops.\n");
+    exit(1);
+  }
+
   fprintf(stdout,
           "Integrated BlobDB: blob files enabled %d, min blob size %" PRIu64
           ", blob file size %" PRIu64
