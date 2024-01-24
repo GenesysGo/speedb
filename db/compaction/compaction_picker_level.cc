@@ -15,6 +15,7 @@
 
 #include "db/version_edit.h"
 #include "logging/log_buffer.h"
+#include "logging/logging.h"
 #include "test_util/sync_point.h"
 
 namespace ROCKSDB_NAMESPACE {
@@ -215,10 +216,6 @@ void LevelCompactionBuilder::SetupInitialFiles() {
         start_level_inputs_.clear();
         if (start_level_ == 0) {
           skipped_l0_to_base = true;
-          // speedb intra L0 compactions are decided in TrySpeedbL0Selection.
-          if (ioptions_.speedb_l0_compaction) {
-            continue;
-          }
           // L0->base_level may be blocked due to ongoing L0->base_level
           // compactions. It may also be blocked by an ongoing compaction from
           // base_level downwards.
@@ -941,6 +938,17 @@ bool LevelCompactionBuilder::PickIntraL0Compaction() {
     // resort to L0->L0 compaction yet.
     return false;
   }
+
+  // dont run if there're compactions other than L0L1.
+  auto compactions_in_progress = compaction_picker_->compactions_in_progress();
+  for (Compaction* c : *compactions_in_progress) {
+    if (c->output_level() > vstorage_->base_level()) {
+      ROCKS_LOG_BUFFER(log_buffer_,
+                       "Aborted intra because of running compactions");
+      return false;
+    }
+  }
+
   return FindIntraL0Compaction(level_files, kMinFilesForIntraL0Compaction,
                                std::numeric_limits<uint64_t>::max(),
                                mutable_cf_options_.max_compaction_bytes,
