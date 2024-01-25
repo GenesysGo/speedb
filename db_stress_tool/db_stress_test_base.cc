@@ -961,6 +961,7 @@ void StressTest::OperateDb(ThreadState* thread) {
 
       if (thread->rand.OneInOpt(FLAGS_manual_wal_flush_one_in)) {
         bool sync = thread->rand.OneIn(2) ? true : false;
+        fprintf(stderr, "manual wal flush: \n");
         Status s = db_->FlushWAL(sync);
         if (!s.ok() && !(sync && s.IsNotSupported())) {
           fprintf(stderr, "FlushWAL(sync=%s) failed: %s\n",
@@ -970,6 +971,7 @@ void StressTest::OperateDb(ThreadState* thread) {
 
       if (thread->rand.OneInOpt(FLAGS_lock_wal_one_in)) {
         Status s = db_->LockWAL();
+        fprintf(stderr, "lock wal: \n");
         if (!s.ok()) {
           fprintf(stderr, "LockWAL() failed: %s\n", s.ToString().c_str());
         } else {
@@ -994,6 +996,7 @@ void StressTest::OperateDb(ThreadState* thread) {
       }
 
       if (thread->rand.OneInOpt(FLAGS_sync_wal_one_in)) {
+        fprintf(stderr, "sync wal : \n");
         Status s = db_->SyncWAL();
         if (!s.ok() && !s.IsNotSupported()) {
           fprintf(stderr, "SyncWAL() failed: %s\n", s.ToString().c_str());
@@ -1004,6 +1007,7 @@ void StressTest::OperateDb(ThreadState* thread) {
       ColumnFamilyHandle* column_family = column_families_[rand_column_family];
 
       if (thread->rand.OneInOpt(FLAGS_compact_files_one_in)) {
+        fprintf(stderr, "compact files : \n");
         TestCompactFiles(thread, column_family);
       }
 
@@ -1012,6 +1016,7 @@ void StressTest::OperateDb(ThreadState* thread) {
       Slice key = keystr;
 
       if (thread->rand.OneInOpt(FLAGS_compact_range_one_in)) {
+        fprintf(stderr, "TestCompactRange \n");
         TestCompactRange(thread, rand_key, key, column_family);
         if (thread->shared->HasVerificationFailedYet()) {
           break;
@@ -1022,6 +1027,7 @@ void StressTest::OperateDb(ThreadState* thread) {
           GenerateColumnFamilies(FLAGS_column_families, rand_column_family);
 
       if (thread->rand.OneInOpt(FLAGS_flush_one_in)) {
+        fprintf(stderr, "TestFlush \n");
         Status status = TestFlush(rand_column_families);
         if (!status.ok()) {
           fprintf(stdout, "Unable to perform Flush(): %s\n",
@@ -1032,6 +1038,7 @@ void StressTest::OperateDb(ThreadState* thread) {
       // Verify GetLiveFiles with a 1 in N chance.
       if (thread->rand.OneInOpt(FLAGS_get_live_files_one_in) &&
           !FLAGS_write_fault_one_in) {
+        fprintf(stderr, "VerifyGetLiveFiles \n");
         Status status = VerifyGetLiveFiles();
         if (!status.ok()) {
           VerificationAbort(shared, "VerifyGetLiveFiles status not OK", status);
@@ -1040,6 +1047,7 @@ void StressTest::OperateDb(ThreadState* thread) {
 
       // Verify GetSortedWalFiles with a 1 in N chance.
       if (thread->rand.OneInOpt(FLAGS_get_sorted_wal_files_one_in)) {
+        fprintf(stderr, "VerifyGetSortedWalFiles \n");
         Status status = VerifyGetSortedWalFiles();
         if (!status.ok()) {
           VerificationAbort(shared, "VerifyGetSortedWalFiles status not OK",
@@ -1049,6 +1057,7 @@ void StressTest::OperateDb(ThreadState* thread) {
 
       // Verify GetCurrentWalFile with a 1 in N chance.
       if (thread->rand.OneInOpt(FLAGS_get_current_wal_file_one_in)) {
+        fprintf(stderr, "VerifyGetCurrentWalFile \n");
         Status status = VerifyGetCurrentWalFile();
         if (!status.ok()) {
           VerificationAbort(shared, "VerifyGetCurrentWalFile status not OK",
@@ -1057,6 +1066,7 @@ void StressTest::OperateDb(ThreadState* thread) {
       }
 
       if (thread->rand.OneInOpt(FLAGS_pause_background_one_in)) {
+        fprintf(stderr, "TestPauseBackground \n");
         Status status = TestPauseBackground(thread);
         if (!status.ok()) {
           VerificationAbort(
@@ -1068,6 +1078,7 @@ void StressTest::OperateDb(ThreadState* thread) {
         ThreadStatusUtil::SetEnableTracking(FLAGS_enable_thread_tracking);
         ThreadStatusUtil::SetThreadOperation(
             ThreadStatus::OperationType::OP_VERIFY_DB_CHECKSUM);
+        fprintf(stderr, "VerifyChecksum \n");
         Status status = db_->VerifyChecksum();
         ThreadStatusUtil::ResetThreadStatus();
         if (!status.ok()) {
@@ -1079,6 +1090,7 @@ void StressTest::OperateDb(ThreadState* thread) {
         ThreadStatusUtil::SetEnableTracking(FLAGS_enable_thread_tracking);
         ThreadStatusUtil::SetThreadOperation(
             ThreadStatus::OperationType::OP_VERIFY_FILE_CHECKSUMS);
+        fprintf(stderr, "VerifyFileChecksums \n");
         Status status = db_->VerifyFileChecksums(read_opts);
         ThreadStatusUtil::ResetThreadStatus();
         if (!status.ok()) {
@@ -1088,12 +1100,14 @@ void StressTest::OperateDb(ThreadState* thread) {
       }
 
       if (thread->rand.OneInOpt(FLAGS_get_property_one_in)) {
+        fprintf(stderr, "TestGetProperty \n");
         TestGetProperty(thread);
       }
 
       std::vector<int64_t> rand_keys = GenerateKeys(rand_key);
 
       if (thread->rand.OneInOpt(FLAGS_ingest_external_file_one_in)) {
+        fprintf(stderr, "TestIngestExternalFile \n");
         TestIngestExternalFile(thread, rand_column_families, rand_keys);
       }
 
@@ -1110,6 +1124,7 @@ void StressTest::OperateDb(ThreadState* thread) {
         }
 
         if (total_size <= FLAGS_backup_max_size) {
+          fprintf(stderr, "TestBackupRestore \n");
           Status s = TestBackupRestore(thread, rand_column_families, rand_keys);
           if (!s.ok()) {
             VerificationAbort(shared, "Backup/restore gave inconsistent state",
@@ -1119,6 +1134,7 @@ void StressTest::OperateDb(ThreadState* thread) {
       }
 
       if (thread->rand.OneInOpt(FLAGS_checkpoint_one_in)) {
+        fprintf(stderr, "TestCheckpoint \n");
         Status s = TestCheckpoint(thread, rand_column_families, rand_keys);
         if (!s.ok()) {
           VerificationAbort(shared, "Checkpoint gave inconsistent state", s);
@@ -1126,6 +1142,7 @@ void StressTest::OperateDb(ThreadState* thread) {
       }
 
       if (thread->rand.OneInOpt(FLAGS_approximate_size_one_in)) {
+        fprintf(stderr, "TestApproximateSize \n");
         Status s =
             TestApproximateSize(thread, i, rand_column_families, rand_keys);
         if (!s.ok()) {
@@ -1133,10 +1150,12 @@ void StressTest::OperateDb(ThreadState* thread) {
         }
       }
       if (thread->rand.OneInOpt(FLAGS_acquire_snapshot_one_in)) {
+        fprintf(stderr, "TestAcquireSnapshot \n");
         TestAcquireSnapshot(thread, rand_column_family, keystr, i);
       }
 
       /*always*/ {
+        fprintf(stderr, "MaybeReleaseSnapshots \n");
         Status s = MaybeReleaseSnapshots(thread, i);
         if (!s.ok()) {
           VerificationAbort(shared, "Snapshot gave inconsistent state", s);
@@ -1170,11 +1189,13 @@ void StressTest::OperateDb(ThreadState* thread) {
 
           rand_keys = GenerateNKeys(thread, static_cast<int>(batch_size), i);
 
+          fprintf(stderr, "TestMultiGetEntity \n");
           TestMultiGetEntity(thread, read_opts, rand_column_families,
                              rand_keys);
 
           i += batch_size - 1;
         } else if (FLAGS_use_get_entity) {
+          fprintf(stderr, "TestGetEntity \n");
           TestGetEntity(thread, read_opts, rand_column_families, rand_keys);
         } else if (FLAGS_use_multiget) {
           // Leave room for one more iteration of the loop with a single key
@@ -1189,6 +1210,7 @@ void StressTest::OperateDb(ThreadState* thread) {
           ThreadStatusUtil::SetEnableTracking(FLAGS_enable_thread_tracking);
           ThreadStatusUtil::SetThreadOperation(
               ThreadStatus::OperationType::OP_MULTIGET);
+          fprintf(stderr, "TestMultiGet \n");
           TestMultiGet(thread, read_opts, rand_column_families, rand_keys);
           ThreadStatusUtil::ResetThreadStatus();
           i += multiget_batch_size - 1;
@@ -1196,6 +1218,7 @@ void StressTest::OperateDb(ThreadState* thread) {
           ThreadStatusUtil::SetEnableTracking(FLAGS_enable_thread_tracking);
           ThreadStatusUtil::SetThreadOperation(
               ThreadStatus::OperationType::OP_GET);
+          fprintf(stderr, "TestGet \n");
           TestGet(thread, read_opts, rand_column_families, rand_keys);
           ThreadStatusUtil::ResetThreadStatus();
         }
@@ -1206,19 +1229,23 @@ void StressTest::OperateDb(ThreadState* thread) {
         // (8 - FLAGS_prefix_size) bytes besides the prefix. So there will
         // be 2 ^ ((8 - FLAGS_prefix_size) * 8) possible keys with the same
         // prefix
+        fprintf(stderr, "TestPrefixScan \n");
         TestPrefixScan(thread, read_opts, rand_column_families, rand_keys);
       } else if (prob_op < write_bound) {
         assert(prefix_bound <= prob_op);
         // OPERATION write
+        fprintf(stderr, "TestPut \n");
         TestPut(thread, write_opts, read_opts, rand_column_families, rand_keys,
                 value);
       } else if (prob_op < del_bound) {
         assert(write_bound <= prob_op);
         // OPERATION delete
+        fprintf(stderr, "TestDelete \n");
         TestDelete(thread, write_opts, rand_column_families, rand_keys);
       } else if (prob_op < delrange_bound) {
         assert(del_bound <= prob_op);
         // OPERATION delete range
+        fprintf(stderr, "TestDeleteRange \n");
         TestDeleteRange(thread, write_opts, rand_column_families, rand_keys);
       } else if (prob_op < iterate_bound) {
         assert(delrange_bound <= prob_op);
@@ -1229,6 +1256,7 @@ void StressTest::OperateDb(ThreadState* thread) {
           ThreadStatusUtil::SetEnableTracking(FLAGS_enable_thread_tracking);
           ThreadStatusUtil::SetThreadOperation(
               ThreadStatus::OperationType::OP_DBITERATOR);
+          fprintf(stderr, "TestIterateAgainstExpected \n");
           TestIterateAgainstExpected(thread, read_opts, rand_column_families,
                                      rand_keys);
           ThreadStatusUtil::ResetThreadStatus();
@@ -1243,17 +1271,20 @@ void StressTest::OperateDb(ThreadState* thread) {
           ThreadStatusUtil::SetEnableTracking(FLAGS_enable_thread_tracking);
           ThreadStatusUtil::SetThreadOperation(
               ThreadStatus::OperationType::OP_DBITERATOR);
+          fprintf(stderr, "TestIterate \n");
           TestIterate(thread, read_opts, rand_column_families, rand_keys);
           ThreadStatusUtil::ResetThreadStatus();
         }
       } else {
         assert(iterate_bound <= prob_op);
+        fprintf(stderr, "TestCustomOperations \n");
         TestCustomOperations(thread, rand_column_families);
       }
       thread->stats.FinishedSingleOp();
     }
   }
   while (!thread->snapshot_queue.empty()) {
+    fprintf(stderr, "ReleaseSnapshot at end \n");
     db_->ReleaseSnapshot(thread->snapshot_queue.front().second.snapshot);
     thread->snapshot_queue.pop();
   }

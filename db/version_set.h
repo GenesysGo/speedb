@@ -1337,6 +1337,7 @@ class VersionSet {
 
   // Set the last sequence number to s.
   void SetLastSequence(uint64_t s) {
+    fprintf(stderr, "sequence set to: %" PRIu64 "\n", s);
     assert(s >= last_sequence_);
     // Last visible sequence must always be less than last written seq
     assert(!db_options_->two_write_queues || s <= last_allocated_sequence_);

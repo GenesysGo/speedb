@@ -396,7 +396,14 @@ class ExpectedStateTraceRecordHandler : public TraceRecord::Handler,
         state_(state),
         buffered_writes_(nullptr) {}
 
-  ~ExpectedStateTraceRecordHandler() { assert(IsDone()); }
+  ~ExpectedStateTraceRecordHandler() {
+    fprintf(stderr,
+            "detore - num_write_ops_: %" PRIu64 "  max_write_ops_: %" PRIu64
+            "\n",
+            num_write_ops_, max_write_ops_);
+
+    assert(IsDone());
+  }
 
   // True if we have already reached the limit on write operations to apply.
   bool IsDone() { return num_write_ops_ == max_write_ops_; }
@@ -449,6 +456,7 @@ class ExpectedStateTraceRecordHandler : public TraceRecord::Handler,
     }
 
     state_->SyncPut(column_family_id, static_cast<int64_t>(key_id), value_base);
+    fprintf(stderr, "PutCF \n");
     ++num_write_ops_;
     return Status::OK();
   }
@@ -486,6 +494,7 @@ class ExpectedStateTraceRecordHandler : public TraceRecord::Handler,
     const uint32_t value_base = GetValueBase(columns.front().value());
 
     state_->SyncPut(column_family_id, static_cast<int64_t>(key_id), value_base);
+    fprintf(stderr, "PutEntityCF \n");
 
     ++num_write_ops_;
 
@@ -508,6 +517,7 @@ class ExpectedStateTraceRecordHandler : public TraceRecord::Handler,
     }
 
     state_->SyncDelete(column_family_id, static_cast<int64_t>(key_id));
+    fprintf(stderr, "DeleteCF \n");
     ++num_write_ops_;
     return Status::OK();
   }
@@ -554,6 +564,7 @@ class ExpectedStateTraceRecordHandler : public TraceRecord::Handler,
     state_->SyncDeleteRange(column_family_id,
                             static_cast<int64_t>(begin_key_id),
                             static_cast<int64_t>(end_key_id));
+    fprintf(stderr, "DeleteRangeCF \n");
     ++num_write_ops_;
     return Status::OK();
   }
@@ -667,6 +678,9 @@ Status FileExpectedStateManager::Restore(DB* db) {
       s = state->Open(false /* create */);
     }
     if (s.ok()) {
+      fprintf(stderr,
+              "Restore - seqno: %" PRIu64 "  saved_seqno_: %" PRIu64 "\n",
+              seqno, saved_seqno_);
       handler.reset(new ExpectedStateTraceRecordHandler(seqno - saved_seqno_,
                                                         state.get()));
       // TODO(ajkr): An API limitation requires we provide `handles` although
