@@ -1218,7 +1218,7 @@ void StressTest::OperateDb(ThreadState* thread) {
           ThreadStatusUtil::SetEnableTracking(FLAGS_enable_thread_tracking);
           ThreadStatusUtil::SetThreadOperation(
               ThreadStatus::OperationType::OP_GET);
-          fprintf(stderr, "TestGet \n");
+          // fprintf(stderr, "TestGet \n");
           TestGet(thread, read_opts, rand_column_families, rand_keys);
           ThreadStatusUtil::ResetThreadStatus();
         }
@@ -1229,7 +1229,7 @@ void StressTest::OperateDb(ThreadState* thread) {
         // (8 - FLAGS_prefix_size) bytes besides the prefix. So there will
         // be 2 ^ ((8 - FLAGS_prefix_size) * 8) possible keys with the same
         // prefix
-        fprintf(stderr, "TestPrefixScan \n");
+        // fprintf(stderr, "TestPrefixScan \n");
         TestPrefixScan(thread, read_opts, rand_column_families, rand_keys);
       } else if (prob_op < write_bound) {
         assert(prefix_bound <= prob_op);
@@ -1271,7 +1271,7 @@ void StressTest::OperateDb(ThreadState* thread) {
           ThreadStatusUtil::SetEnableTracking(FLAGS_enable_thread_tracking);
           ThreadStatusUtil::SetThreadOperation(
               ThreadStatus::OperationType::OP_DBITERATOR);
-          fprintf(stderr, "TestIterate \n");
+          // fprintf(stderr, "TestIterate \n");
           TestIterate(thread, read_opts, rand_column_families, rand_keys);
           ThreadStatusUtil::ResetThreadStatus();
         }
