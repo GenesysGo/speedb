@@ -148,7 +148,8 @@ class VersionStorageInfo {
                      bool _force_consistency_checks,
                      EpochNumberRequirement epoch_number_requirement,
                      SystemClock* clock,
-                     uint32_t bottommost_file_compaction_delay);
+                     uint32_t bottommost_file_compaction_delay,
+                     const uint64_t base_level_size = 0);
   // No copying allowed
   VersionStorageInfo(const VersionStorageInfo&) = delete;
   void operator=(const VersionStorageInfo&) = delete;
@@ -677,8 +678,11 @@ class VersionStorageInfo {
 
   // A list for the same set of files that are stored in files_,
   // but files in each level are now sorted based on file
-  // size. The file with the largest size is at the front.
+  // size. or other pri as in CompactionPri advanced_options.h .
+  // sorting is done in each version edit in PrepareForVersionAppend.
+  // The file with the largest size is at the front.
   // This vector stores the index of the file from files_.
+  // only first number_of_files_to_sort_ files are sorted.
   std::vector<std::vector<int>> files_by_compaction_pri_;
 
   // If true, means that files in L0 have keys with non overlapping ranges
@@ -774,6 +778,10 @@ class VersionStorageInfo {
   bool force_consistency_checks_;
 
   EpochNumberRequirement epoch_number_requirement_;
+
+  // mutable_cf_options.max_bytes_for_level_base
+  size_t max_size_to_compact_;
+  // bool one_compaction_thread;
 
   friend class Version;
   friend class VersionSet;
