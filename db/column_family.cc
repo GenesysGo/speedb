@@ -1120,7 +1120,6 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     // possible that a later condition will require a harder rate limiting.
     // calculate all conditions with DynamicSetupDelay and reevaluate the
     // write_stall_cause. this is only relevant in the kDelayed case.
-    write_stall_condition = WriteStallCondition::kDelayed;
     if (dynamic_delay) {
       if (write_stall_condition == WriteStallCondition::kDelayed) {
         DynamicSetupDelay(write_controller->max_delayed_write_rate(),
@@ -1131,7 +1130,6 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
         write_controller->HandleRemoveDelayReq(this);
       }
     }
-    write_stall_condition = WriteStallCondition::kDelayed;
 
     if (write_stall_condition == WriteStallCondition::kStopped &&
         write_stall_cause == WriteStallCause::kMemtableLimit) {
