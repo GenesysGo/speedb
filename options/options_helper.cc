@@ -349,6 +349,7 @@ void UpdateColumnFamilyOptions(const ImmutableCFOptions& ioptions,
   cf_opts->max_write_buffer_size_to_maintain =
       ioptions.max_write_buffer_size_to_maintain;
   cf_opts->inplace_update_support = ioptions.inplace_update_support;
+  cf_opts->speedb_l0_compaction = ioptions.speedb_l0_compaction;
   cf_opts->inplace_callback = ioptions.inplace_callback;
   cf_opts->memtable_factory = ioptions.memtable_factory;
   cf_opts->table_factory = ioptions.table_factory;

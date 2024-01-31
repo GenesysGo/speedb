@@ -92,6 +92,8 @@ class LevelCompactionBuilder {
   // function will return false.
   bool PickFileToCompact();
 
+  bool TrySpeedbL0Selection();
+
   // Return true if a L0 trivial move is picked up.
   bool TryPickL0TrivialMove();
 
@@ -145,6 +147,7 @@ class LevelCompactionBuilder {
                             int level);
 
   static const int kMinFilesForIntraL0Compaction = 4;
+  static const int kMaxAllowedWrAmp = 3;
 };
 
 void LevelCompactionBuilder::PickFileToCompact(
@@ -212,6 +215,10 @@ void LevelCompactionBuilder::SetupInitialFiles() {
         start_level_inputs_.clear();
         if (start_level_ == 0) {
           skipped_l0_to_base = true;
+          // speedb intra L0 compactions are decided in TrySpeedbL0Selection.
+          if (ioptions_.speedb_l0_compaction) {
+            continue;
+          }
           // L0->base_level may be blocked due to ongoing L0->base_level
           // compactions. It may also be blocked by an ongoing compaction from
           // base_level downwards.
@@ -751,6 +758,66 @@ bool LevelCompactionBuilder::TryExtendNonL0TrivialMove(int start_index,
   return false;
 }
 
+// Selects all L0 files since they usually all overlap.
+// Its not possible to run 2 simultaneous L0 compactions so non of the files
+// should be under compaction.
+// If the size of all L0 files is less than L1 overlapped size divided by
+// kMaxAllowedWrAmp then run Intra L0 compaction, if not then run L0L1.
+bool LevelCompactionBuilder::TrySpeedbL0Selection() {
+  assert(start_level_ == 0);
+  // pick all L0 files.
+  const std::vector<FileMetaData*>& level_files =
+      vstorage_->LevelFiles(0 /* level */);
+  // add all L0 files to inputs.
+  for (size_t i = 0; i < level_files.size(); i++) {
+    auto* f = level_files[i];
+    assert(f->being_compacted == false);
+    start_level_inputs_.files.push_back(f);
+  }
+
+  InternalKey smallest, largest;
+  compaction_picker_->GetRange(start_level_inputs_, &smallest, &largest);
+
+  CompactionInputFiles output_level_inputs;
+  output_level_inputs.level = output_level_;
+  vstorage_->GetOverlappingInputs(output_level_, &smallest, &largest,
+                                  &output_level_inputs.files);
+  uint64_t l1_overlapped_size = 0;
+  bool l1_being_compacted = false;
+  for (auto file : output_level_inputs.files) {
+    l1_overlapped_size += file->fd.file_size;
+    if (file->being_compacted) {
+      l1_being_compacted = true;
+    }
+  }
+  auto l0_size = vstorage_->NumLevelBytes(0);
+  // If L0L1 compaction results in over kMaxAllowedWrAmp Write Amp then schedule
+  // Intra L0 compaction instead.
+  // Theres a scenario where L1 size is very big will cause continuous intra L0
+  // TODO: fix comment compactions which will increase the size of L0 and then
+  // L1 consequently. To prevent such a scenario, we'll only run intra L0
+  // compactions when: l0_size < 2 * max_bytes_for_level_base
+  if ((l0_size < (l1_overlapped_size / kMaxAllowedWrAmp)) &&
+      (l0_size < 2 * mutable_cf_options_.max_bytes_for_level_base)) {
+    output_level_ = 0;
+  }
+
+  bool clean_cut = true;
+  if (!output_level_inputs.empty()) {
+    clean_cut = compaction_picker_->ExpandInputsToCleanCut(
+        cf_name_, vstorage_, &output_level_inputs);
+  }
+  // Abort the L0L1 compaction in two cases:
+  // 1. If overlapping files in L1 are in compaction.
+  // 2. If there isn't a 'clean cut' between the files picked in L1 and their
+  // surrounding.
+  if (l1_being_compacted || !clean_cut) {
+    start_level_inputs_.clear();
+  }
+
+  return start_level_inputs_.size() > 0;
+}
+
 bool LevelCompactionBuilder::PickFileToCompact() {
   // level 0 files are overlapping. So we cannot pick more
   // than one concurrent compactions at this level. This
@@ -769,6 +836,10 @@ bool LevelCompactionBuilder::PickFileToCompact() {
 
   if (TryPickL0TrivialMove()) {
     return true;
+  }
+
+  if (start_level_ == 0 && ioptions_.speedb_l0_compaction) {
+    return TrySpeedbL0Selection();
   }
 
   const std::vector<FileMetaData*>& level_files =
@@ -800,6 +871,7 @@ bool LevelCompactionBuilder::PickFileToCompact() {
     }
 
     start_level_inputs_.files.push_back(f);
+    // expand start_level_inputs_ to all overlapping
     if (!compaction_picker_->ExpandInputsToCleanCut(cf_name_, vstorage_,
                                                     &start_level_inputs_) ||
         compaction_picker_->FilesRangeOverlapWithCompaction(
