@@ -1148,6 +1148,12 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
         l0_start_clearance_time_ = 0;
       }
 
+      // treat pending compaction bytes stop condition as delay.
+      if (write_stall_condition == WriteStallCondition::kStopped &&
+          write_stall_cause == WriteStallCause::kPendingCompactionBytes) {
+        write_stall_condition = WriteStallCondition::kDelayed;
+      }
+
       if (write_stall_condition == WriteStallCondition::kDelayed) {
         DynamicSetupDelay(l0_base_compaction_speed(), compaction_needed_bytes,
                           mutable_cf_options, write_stall_cause);
