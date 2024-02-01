@@ -1089,17 +1089,19 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
 
 void ColumnFamilyData::SetL0BaseCompactionSpeed(uint64_t size) {
   assert(l0_start_clearance_time_ > 0);
-  uint64_t l0_clearance_dur =
-      ioptions_.clock->NowMicros() - l0_start_clearance_time_;
-  assert(l0_clearance_dur > 0);
-  const int micros_in_sec = 1000000;
-  lo_base_compaction_speed_ = (size / l0_clearance_dur) * micros_in_sec;
-  started_l0_timer_ = false;
-  l0_start_clearance_time_ = 0;
-  ROCKS_LOG_WARN(ioptions_.logger,
-                 "L0L1 compaction ended. duration : %" PRIu64
-                 " . amount cleared: %" PRIu64 " rate: %" PRIu64,
-                 l0_clearance_dur, size, lo_base_compaction_speed_);
+  if (started_l0_timer_ == true) {
+    uint64_t l0_clearance_dur =
+        ioptions_.clock->NowMicros() - l0_start_clearance_time_;
+    assert(l0_clearance_dur > 0);
+    const int micros_in_sec = 1000000;
+    lo_base_compaction_speed_ = (size / l0_clearance_dur) * micros_in_sec;
+    started_l0_timer_ = false;
+    l0_start_clearance_time_ = 0;
+    ROCKS_LOG_INFO(ioptions_.logger,
+                   "L0L1 compaction ended. duration : %" PRIu64
+                   " . amount cleared: %" PRIu64 " rate: %" PRIu64,
+                   l0_clearance_dur, size, lo_base_compaction_speed_);
+  }
 }
 
 WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
@@ -1135,18 +1137,14 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
 
       // start timer for L0 clearance when trigger passed.
       if (!started_l0_timer_ &&
-          vstorage->l0_delay_trigger_count() >
+          vstorage->l0_delay_trigger_count() >=
               mutable_cf_options.level0_file_num_compaction_trigger) {
         started_l0_timer_ = true;
         l0_start_clearance_time_ = ioptions_.clock->NowMicros();
-      }
-
-      // reset timer when theres less L0 files than trigger.
-      if (started_l0_timer_ &&
-          vstorage->l0_delay_trigger_count() <
-              mutable_cf_options.level0_file_num_compaction_trigger) {
-        started_l0_timer_ = false;
-        l0_start_clearance_time_ = 0;
+        ROCKS_LOG_INFO(
+            ioptions_.logger,
+            "Auto tune: Started timer. time: %" PRIu64 " Num L0 files: %d",
+            l0_start_clearance_time_, vstorage->l0_delay_trigger_count());
       }
 
       // treat pending compaction bytes stop condition as delay.
