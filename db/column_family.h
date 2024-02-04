@@ -522,6 +522,7 @@ class ColumnFamilyData {
   // set to false whenever L0L1 compaction ends or L0 files
   // reached below compaction trigger
   bool started_l0_timer_ = false;
+  bool first_l0_comp_ = true;
 
   // Used for Speedb delay write rate auto tuning;
   // Init with rate of 200Mb to help with delay until the first L0L1 compaction

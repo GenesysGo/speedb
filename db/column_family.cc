@@ -1088,19 +1088,27 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
 }
 
 void ColumnFamilyData::SetL0BaseCompactionSpeed(uint64_t size) {
-  assert(l0_start_clearance_time_ > 0);
   if (started_l0_timer_ == true) {
+    assert(l0_start_clearance_time_ > 0);
     uint64_t l0_clearance_dur =
         ioptions_.clock->NowMicros() - l0_start_clearance_time_;
     assert(l0_clearance_dur > 0);
     const int micros_in_sec = 1000000;
-    lo_base_compaction_speed_ = (size / l0_clearance_dur) * micros_in_sec;
+    auto cur_speed = (size / l0_clearance_dur) * micros_in_sec;
+    if (first_l0_comp_) {
+      first_l0_comp_ = false;
+      lo_base_compaction_speed_ = cur_speed / 2;
+    }
+    lo_base_compaction_speed_ =
+        0.9 * lo_base_compaction_speed_ + (0.1 * cur_speed);
     started_l0_timer_ = false;
     l0_start_clearance_time_ = 0;
     ROCKS_LOG_INFO(ioptions_.logger,
                    "L0L1 compaction ended. duration : %" PRIu64
-                   " . amount cleared: %" PRIu64 " rate: %" PRIu64,
-                   l0_clearance_dur, size, lo_base_compaction_speed_);
+                   ", amount cleared: %" PRIu64 ", current rate: %" PRIu64
+                   ", avg rate: %" PRIu64,
+                   l0_clearance_dur, size, cur_speed,
+                   lo_base_compaction_speed_);
   }
 }
 
