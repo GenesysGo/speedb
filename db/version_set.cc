@@ -2138,7 +2138,7 @@ VersionStorageInfo::VersionStorageInfo(
     CompactionStyle compaction_style, VersionStorageInfo* ref_vstorage,
     bool _force_consistency_checks,
     EpochNumberRequirement epoch_number_requirement, SystemClock* clock,
-    uint32_t bottommost_file_compaction_delay)
+    uint32_t bottommost_file_compaction_delay, uint64_t base_level_size)
     : internal_comparator_(internal_comparator),
       user_comparator_(user_comparator),
       // cfd is nullptr if Version is dummy
@@ -2171,6 +2171,8 @@ VersionStorageInfo::VersionStorageInfo(
       finalized_(false),
       force_consistency_checks_(_force_consistency_checks),
       epoch_number_requirement_(epoch_number_requirement) {
+  max_size_to_compact_ = 3 * base_level_size;
+
   if (ref_vstorage != nullptr) {
     accumulated_file_size_ = ref_vstorage->accumulated_file_size_;
     accumulated_raw_key_size_ = ref_vstorage->accumulated_raw_key_size_;
@@ -2214,9 +2216,9 @@ Version::Version(ColumnFamilyData* column_family_data, VersionSet* vset,
           cfd_ == nullptr ? false : cfd_->ioptions()->force_consistency_checks,
           epoch_number_requirement,
           cfd_ == nullptr ? nullptr : cfd_->ioptions()->clock,
-          cfd_ == nullptr
-              ? 0
-              : mutable_cf_options.bottommost_file_compaction_delay),
+          cfd_ == nullptr ? 0
+                          : mutable_cf_options.bottommost_file_compaction_delay,
+          mutable_cf_options.max_bytes_for_level_base),
       vset_(vset),
       next_(this),
       prev_(this),
@@ -4321,11 +4323,20 @@ void VersionStorageInfo::GetOverlappingInputs(
     user_end = end->user_key();
   }
 
-  // index stores the file index need to check.
+  // sortedness is required for https://github.com/speedb-io/speedb/issues/154.
+  // order of files is newest to oldest.
+  // files seq: 21 - 30 , 11 - 20 , 1 - 10
+  for (size_t i = 1; i < level_files_brief_[level].num_files; i++) {
+    assert(files_[0][i - 1]->fd.smallest_seqno >=
+           files_[0][i]->fd.largest_seqno);
+  }
+  // build index in reverse order to make sure that files are picked from oldest
+  // to newest. index stores the file index need to check.
   std::list<size_t> index;
-  for (size_t i = 0; i < level_files_brief_[level].num_files; i++) {
+  for (int64_t i = level_files_brief_[level].num_files - 1; i >= 0; i--) {
     index.emplace_back(i);
   }
+  uint64_t cur_files_size = 0;
 
   while (!index.empty()) {
     bool found_overlapping_file = false;
@@ -4345,6 +4356,7 @@ void VersionStorageInfo::GetOverlappingInputs(
       } else {
         // if overlap
         inputs->emplace_back(files_[level][*iter]);
+        cur_files_size += f->fd.file_size;
         found_overlapping_file = true;
         // record the first file index.
         if (file_index && *file_index == -1) {
@@ -4361,6 +4373,12 @@ void VersionStorageInfo::GetOverlappingInputs(
               user_cmp->CompareWithoutTimestamp(file_limit, user_end) > 0) {
             user_end = file_limit;
           }
+        }
+
+        // stop accumulating L0 files for compaction once enough are added.
+        // stop when: total size of currently selected files is big enough.
+        if (cur_files_size > max_size_to_compact_) {
+          return;
         }
       }
     }
