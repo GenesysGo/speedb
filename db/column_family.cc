@@ -1097,10 +1097,14 @@ void ColumnFamilyData::SetL0BaseCompactionSpeed(uint64_t size) {
     auto cur_speed = (size / l0_clearance_dur) * micros_in_sec;
     if (first_l0_comp_) {
       first_l0_comp_ = false;
+      // Since first compaction is more prone to variability in speed we'd
+      // rather over-delay than under-delay
       lo_base_compaction_speed_ = cur_speed / 2;
+    } else {
+      lo_base_compaction_speed_ =
+          mutable_cf_options_.l0_rate_factor * lo_base_compaction_speed_ +
+          ((1 - mutable_cf_options_.l0_rate_factor) * cur_speed);
     }
-    lo_base_compaction_speed_ =
-        0.9 * lo_base_compaction_speed_ + (0.1 * cur_speed);
     started_l0_timer_ = false;
     l0_start_clearance_time_ = 0;
     ROCKS_LOG_INFO(ioptions_.logger,

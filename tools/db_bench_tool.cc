@@ -1645,6 +1645,12 @@ DEFINE_double(experimental_mempurge_threshold,
               ROCKSDB_NAMESPACE::Options().experimental_mempurge_threshold,
               "Maximum useful payload ratio estimate that triggers a mempurge "
               "(memtable garbage collection).");
+
+DEFINE_double(l0_rate_factor, ROCKSDB_NAMESPACE::Options().l0_rate_factor,
+              "A number between 0 and 1 to decide the weight of the previous  "
+              "l0 rate in calculating the current rate "
+              "e.g. 0.7 is 0.7 * prev_rate + 0.3 * current rate");
+
 DEFINE_bool(use_spdb_writes, false, "Use optimized Speedb write flow");
 
 DEFINE_bool(inplace_update_support,
@@ -4979,6 +4985,10 @@ class Benchmark {
     options.delayed_write_rate = FLAGS_delayed_write_rate;
     options.allow_concurrent_memtable_write =
         FLAGS_allow_concurrent_memtable_write;
+    if (FLAGS_l0_rate_factor > 1 || FLAGS_l0_rate_factor < 0) {
+      ErrorExit("l0_rate_factor should be between 0 and 1");
+    }
+    options.l0_rate_factor = FLAGS_l0_rate_factor;
     options.experimental_mempurge_threshold =
         FLAGS_experimental_mempurge_threshold;
     options.use_spdb_writes = FLAGS_use_spdb_writes;

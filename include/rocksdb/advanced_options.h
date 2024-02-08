@@ -394,6 +394,7 @@ struct AdvancedColumnFamilyOptions {
 
   // TODO: add description
   bool speedb_l0_compaction = true;
+  double l0_rate_factor = 0.7;
 
   // Number of locks used for inplace update
   // Default: 10000, if inplace_update_support = true, else 0.
