@@ -1098,7 +1098,7 @@ void ColumnFamilyData::SetL0BaseCompactionSpeed(uint64_t size) {
         ioptions_.clock->NowMicros() - l0_start_clearance_time_;
     assert(l0_clearance_dur > 0);
     const int micros_in_sec = 1000000;
-    auto cur_speed = (size / l0_clearance_dur) * micros_in_sec;
+    uint64_t cur_speed = (size / l0_clearance_dur) * micros_in_sec;
     if (first_l0_comp_) {
       first_l0_comp_ = false;
       // Since first compaction is more prone to variability in speed we'd
