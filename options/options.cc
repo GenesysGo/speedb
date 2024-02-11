@@ -66,6 +66,7 @@ AdvancedColumnFamilyOptions::AdvancedColumnFamilyOptions(const Options& options)
       max_write_buffer_size_to_maintain(
           options.max_write_buffer_size_to_maintain),
       inplace_update_support(options.inplace_update_support),
+      l0_rate_factor(options.l0_rate_factor),
       inplace_update_num_locks(options.inplace_update_num_locks),
       experimental_mempurge_threshold(options.experimental_mempurge_threshold),
       inplace_callback(options.inplace_callback),
@@ -478,6 +479,8 @@ void ColumnFamilyOptions::Dump(Logger* log) const {
               ? "flush only"
               : "disabled");
     }
+    ROCKS_LOG_HEADER(log, "                         Options.l0_rate_factor: %f",
+                     l0_rate_factor);
     ROCKS_LOG_HEADER(log, "        Options.experimental_mempurge_threshold: %f",
                      experimental_mempurge_threshold);
     ROCKS_LOG_HEADER(log, "           Options.memtable_max_range_deletions: %d",

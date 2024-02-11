@@ -261,6 +261,7 @@ void UpdateColumnFamilyOptions(const MutableCFOptions& moptions,
   cf_opts->max_successive_merges = moptions.max_successive_merges;
   cf_opts->inplace_update_num_locks = moptions.inplace_update_num_locks;
   cf_opts->prefix_extractor = moptions.prefix_extractor;
+  cf_opts->l0_rate_factor = moptions.l0_rate_factor;
   cf_opts->experimental_mempurge_threshold =
       moptions.experimental_mempurge_threshold;
   cf_opts->memtable_protection_bytes_per_key =

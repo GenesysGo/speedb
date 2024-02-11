@@ -392,6 +392,10 @@ struct AdvancedColumnFamilyOptions {
   // Default: false.
   bool inplace_update_support = false;
 
+  // TODO: add description
+  // TODO: fix to include other cfs and WBM
+  double l0_rate_factor = 0.7;
+
   // Number of locks used for inplace update
   // Default: 10000, if inplace_update_support = true, else 0.
   //

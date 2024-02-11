@@ -25,6 +25,7 @@
 
 #include <algorithm>
 #include <cinttypes>
+#include <cmath>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -901,8 +902,9 @@ int GetL0ThresholdSpeedupCompaction(int level0_file_num_compaction_trigger,
 }  // anonymous namespace
 
 namespace {
-const int kMemtablePenalty = 10;
+const int kMemtablePenalty = 5;
 const int kNumPendingSteps = 100;
+const double kGoalMbs = 5242880.0;
 }  // namespace
 
 double ColumnFamilyData::TEST_CalculateWriteDelayDivider(
@@ -917,6 +919,7 @@ void ColumnFamilyData::DynamicSetupDelay(
     uint64_t max_write_rate, uint64_t compaction_needed_bytes,
     const MutableCFOptions& mutable_cf_options,
     WriteStallCause& write_stall_cause) {
+  assert(max_write_rate > 0);
   const double rate_divider =
       CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
           compaction_needed_bytes, mutable_cf_options, write_stall_cause);
@@ -1009,6 +1012,7 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
         1 / (1 - (static_cast<double>(step_num) / kNumPendingSteps));
   }
 
+  pending_divider = 1;
   double biggest_divider = 1;
   if (memtable_divider > pending_divider) {
     biggest_divider = memtable_divider;
@@ -1024,16 +1028,59 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
   }
 
   // L0 files
+  //
+  // L0 files increase steadily and then drop in a batch when the L0L1 / intra
+  // compaction ends. We'd like to avoid steadily decreasing the write speed
+  // along with the L0 accumulation and then increasing it heavily when the
+  // compaction ends.
+  // Another consideration is to never reach level0_stop_writes_trigger.
+  // The initial L0 delay write rate is set according to the speed L0 can
+  // clear data which is the amount of data moved from L0 to L1 divided by the
+  // time it was above compaction trigger.
+  // This is calculated and set when the L0L1 compaction ends in
+  // CompactionJob::Install.
+  // Use this rate for the first extra slowdown files and then heavily delay the
+  // rest of the files. In any case, delay at least 2
+  // * trigger.
+
+  // slowdown 12 ; stop 30; - start at 22
+  // slowdown 12 ; stop 50; - start at 24
+  // slowdown 12 ; stop 16; start at 12
+  auto slowdown = mutable_cf_options.level0_slowdown_writes_trigger;
+  auto stop = mutable_cf_options.level0_stop_writes_trigger;
+  auto trigger = mutable_cf_options.level0_file_num_compaction_trigger;
+
+  auto file_to_start_delay = slowdown;
+  auto gap = stop - slowdown;
+  if ((gap > (slowdown + 2 * trigger))) {
+    file_to_start_delay = slowdown * 2;
+  } else if (stop - (2 * trigger) > slowdown) {
+    file_to_start_delay = stop - (2 * trigger);
+  } else {
+    file_to_start_delay = slowdown;
+  }
+  // The goal is to reach kGoalMbs 3 steps before stop condition so that we
+  // never reach it. The formula to decide the delay percentage is: kGoalMbs =
+  // start_rate * (delay_percent ^ num_steps) where: kGoalMbs = 5 , start_rate
+  // is the l0_compaction_speed num_steps = num_L0_steps - 3.
   double l0_divider = 1;
-  const auto extra_l0_ssts = vstorage->l0_delay_trigger_count() -
-                             mutable_cf_options.level0_slowdown_writes_trigger;
+  const auto extra_l0_ssts =
+      vstorage->l0_delay_trigger_count() - file_to_start_delay;
   if (extra_l0_ssts > 0) {
-    const auto num_L0_steps = mutable_cf_options.level0_stop_writes_trigger -
-                              mutable_cf_options.level0_slowdown_writes_trigger;
+    const auto num_L0_steps = stop - file_to_start_delay;
     assert(num_L0_steps > 0);
+    double num_steps = num_L0_steps > 6 ? num_L0_steps - 3 : num_L0_steps;
+    auto base = kGoalMbs / l0_base_compaction_speed();
+    // in cases where l0_base_compaction_speed() is lower than our goal Mbs
+    if (base > 1) {
+      base = 0.95;
+    }
+    double delay_percent = std::pow(base, 1.0 / num_steps);
+    assert(delay_percent > 0 && delay_percent < 1);
     // since extra_l0_ssts == num_L0_steps then we're in a stop condition.
     assert(extra_l0_ssts < num_L0_steps);
-    l0_divider = 1 / (1 - (static_cast<double>(extra_l0_ssts) / num_L0_steps));
+
+    l0_divider = 1 / (std::pow(delay_percent, extra_l0_ssts));
   }
 
   if (l0_divider > biggest_divider) {
@@ -1042,6 +1089,35 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
   }
 
   return biggest_divider;
+}
+
+void ColumnFamilyData::SetL0BaseCompactionSpeed(uint64_t size) {
+  if (started_l0_timer_ == true) {
+    assert(l0_start_clearance_time_ > 0);
+    float l0_clearance_dur =
+        ioptions_.clock->NowMicros() - l0_start_clearance_time_;
+    assert(l0_clearance_dur > 0);
+    const int micros_in_sec = 1000000;
+    auto cur_speed = (size / l0_clearance_dur) * micros_in_sec;
+    if (first_l0_comp_) {
+      first_l0_comp_ = false;
+      // Since first compaction is more prone to variability in speed we'd
+      // rather over-delay than under-delay
+      lo_base_compaction_speed_ = cur_speed / 2;
+    } else {
+      lo_base_compaction_speed_ =
+          mutable_cf_options_.l0_rate_factor * lo_base_compaction_speed_ +
+          ((1 - mutable_cf_options_.l0_rate_factor) * cur_speed);
+    }
+    started_l0_timer_ = false;
+    l0_start_clearance_time_ = 0;
+    ROCKS_LOG_INFO(ioptions_.logger,
+                   "L0L1 compaction ended. duration : %f"
+                   ", amount cleared: %" PRIu64 ", current rate: %" PRIu64
+                   ", avg rate: %" PRIu64,
+                   l0_clearance_dur, size, cur_speed,
+                   lo_base_compaction_speed_);
+  }
 }
 
 WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
@@ -1064,15 +1140,26 @@ WriteStallCondition ColumnFamilyData::RecalculateWriteStallConditions(
     bool needed_delay = write_controller->NeedsDelay();
     bool dynamic_delay = write_controller->is_dynamic_delay();
 
-    // GetWriteStallConditionAndCause returns the first condition met, so its
-    // possible that a later condition will require a harder rate limiting.
-    // calculate all conditions with DynamicSetupDelay and reevaluate the
-    // write_stall_cause. this is only relevant in the kDelayed case.
     if (dynamic_delay) {
+      // start timer for L0 clearance when trigger passed.
+      if (!started_l0_timer_ &&
+          vstorage->l0_delay_trigger_count() >=
+              mutable_cf_options.level0_file_num_compaction_trigger) {
+        started_l0_timer_ = true;
+        l0_start_clearance_time_ = ioptions_.clock->NowMicros();
+        ROCKS_LOG_INFO(
+            ioptions_.logger,
+            "Auto tune: Started timer. time: %" PRIu64 " Num L0 files: %d",
+            l0_start_clearance_time_, vstorage->l0_delay_trigger_count());
+      }
+
+      // GetWriteStallConditionAndCause returns the first condition met, so its
+      // possible that a later condition will require a harder rate limiting.
+      // calculate all conditions with DynamicSetupDelay and reevaluate the
+      // write_stall_cause. this is only relevant in the kDelayed case.
       if (write_stall_condition == WriteStallCondition::kDelayed) {
-        DynamicSetupDelay(write_controller->max_delayed_write_rate(),
-                          compaction_needed_bytes, mutable_cf_options,
-                          write_stall_cause);
+        DynamicSetupDelay(l0_base_compaction_speed(), compaction_needed_bytes,
+                          mutable_cf_options, write_stall_cause);
         write_controller_token_.reset();
       } else {
         write_controller->HandleRemoveDelayReq(this);

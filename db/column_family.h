@@ -507,7 +507,28 @@ class ColumnFamilyData {
 
   VersionStorageInfo* TEST_GetCurrentStorageInfo();
 
+  // set in CompactionJob::Install (DB mutex held)
+  // also read and set in ColumnFamilyData::AutoTuneMaxRate
+  void SetL0BaseCompactionSpeed(uint64_t size);
+
  private:
+  // In bytes per sec. same as delayed_write_rate
+  uint64_t l0_base_compaction_speed() const {
+    return lo_base_compaction_speed_;
+  }
+
+  uint64_t l0_start_clearance_time_ = 0;
+
+  // set to false whenever L0L1 compaction ends or L0 files
+  // reached below compaction trigger
+  bool started_l0_timer_ = false;
+  bool first_l0_comp_ = true;
+
+  // Used for Speedb delay write rate auto tuning;
+  // Init with rate of 200Mb to help with delay until the first L0L1 compaction
+  // finishes.
+  uint64_t lo_base_compaction_speed_ = 209715200;
+
   void UpdateCFRate(void* client_id, uint64_t write_rate);
   void ResetCFRate(void* client_id);
 
