@@ -1053,9 +1053,9 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
   auto file_to_start_delay = slowdown;
   auto gap = stop - slowdown;
   if ((gap > (slowdown + 2 * trigger))) {
-    file_to_start_delay = slowdown * 2;
-  } else if (stop - (2 * trigger) > slowdown) {
-    file_to_start_delay = stop - (2 * trigger);
+    file_to_start_delay = slowdown + 2 * trigger;
+  } else if (slowdown + (2 * trigger) < stop) {
+    file_to_start_delay = slowdown + trigger;
   } else {
     file_to_start_delay = slowdown;
   }
@@ -1069,8 +1069,8 @@ ColumnFamilyData::CalculateWriteDelayDividerAndMaybeUpdateWriteStallCause(
   if (extra_l0_ssts > 0) {
     const auto num_L0_steps = stop - file_to_start_delay;
     assert(num_L0_steps > 0);
-    double num_steps = num_L0_steps > 6 ? num_L0_steps - 3 : num_L0_steps;
-    auto base = kGoalMbs / l0_base_compaction_speed();
+    double num_steps = num_L0_steps > 6 ? num_L0_steps - 1 : num_L0_steps;
+    auto base = (kGoalMbs / 5) / l0_base_compaction_speed();
     // in cases where l0_base_compaction_speed() is lower than our goal Mbs
     if (base > 1) {
       base = 0.95;
