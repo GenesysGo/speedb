@@ -484,11 +484,11 @@ class ColumnFamilyData {
   bool queued_for_compaction() { return queued_for_compaction_; }
 
   static std::pair<WriteStallCondition, WriteStallCause>
-  GetWriteStallConditionAndCause(
-      int num_unflushed_memtables, int num_l0_files,
-      uint64_t num_compaction_needed_bytes,
-      const MutableCFOptions& mutable_cf_options,
-      const ImmutableCFOptions& immutable_cf_options);
+  GetWriteStallConditionAndCause(int num_unflushed_memtables, int num_l0_files,
+                                 uint64_t num_compaction_needed_bytes,
+                                 const MutableCFOptions& mutable_cf_options,
+                                 const ImmutableCFOptions& immutable_cf_options,
+                                 int running_flushes = 0);
 
   // Recalculate some stall conditions, which are changed only during
   // compaction, adding new memtable and/or recalculation of compaction score.
@@ -496,6 +496,16 @@ class ColumnFamilyData {
       const MutableCFOptions& mutable_cf_options);
 
   bool IsLastLevelWithData(int level) const;
+
+  void DecrRunningFlushes() {
+    assert(running_flushes_ > 0);
+    --running_flushes_;
+  }
+
+  void IncrRunningFlushes() {
+    assert(running_flushes_ >= 0);
+    ++running_flushes_;
+  }
 
   // REQUIREMENT: db mutex must be held
   double TEST_CalculateWriteDelayDivider(
@@ -541,6 +551,8 @@ class ColumnFamilyData {
       uint64_t compaction_needed_bytes,
       const MutableCFOptions& mutable_cf_options,
       WriteStallCause& write_stall_cause);
+
+  std::atomic<int> running_flushes_ = 0;
 
  public:
   void set_initialized() { initialized_.store(true); }

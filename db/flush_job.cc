@@ -158,9 +158,13 @@ FlushJob::FlushJob(
   TEST_SYNC_POINT("FlushJob::FlushJob()");
 }
 
-FlushJob::~FlushJob() { ThreadStatusUtil::ResetThreadStatus(); }
+FlushJob::~FlushJob() {
+  cfd_->DecrRunningFlushes();
+  ThreadStatusUtil::ResetThreadStatus();
+}
 
 void FlushJob::ReportStartedFlush() {
+  cfd_->IncrRunningFlushes();
   ThreadStatusUtil::SetEnableTracking(db_options_.enable_thread_tracking);
   ThreadStatusUtil::SetColumnFamily(cfd_);
   ThreadStatusUtil::SetThreadOperation(ThreadStatus::OP_FLUSH);
