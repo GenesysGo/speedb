@@ -27,9 +27,9 @@
     </licenses>
 
     <scm>
-        <connection>scm:git:https://github.com/speedb-io/speedb.git</connection>
-        <developerConnection>scm:git:https://github.com/speedb-io/speedb.git</developerConnection>
-        <url>scm:git:https://github.com/speedb-io/speedb.git</url>
+        <connection>scm:git:https://github.com/GenesysGo/speedb.git</connection>
+        <developerConnection>scm:git:https://github.com/GenesysGo/speedb.git</developerConnection>
+        <url>scm:git:https://github.com/GenesysGo/speedb.git</url>
     </scm>
 
     <organization>

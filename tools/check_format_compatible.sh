@@ -41,7 +41,7 @@ git remote remove $tmp_origin 2>/dev/null || true
 if [ "$USE_SSH" ]; then
   git remote add $tmp_origin "git@github.com:speedb-io/speedb.git"
 else
-  git remote add $tmp_origin "https://github.com/speedb-io/speedb.git"
+  git remote add $tmp_origin "https://github.com/GenesysGo/speedb.git"
 fi
 git fetch $tmp_origin
 
