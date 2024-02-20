@@ -3460,6 +3460,11 @@ void rocksdb_options_set_allow_concurrent_memtable_write(rocksdb_options_t* opt,
   opt->rep.allow_concurrent_memtable_write = v;
 }
 
+void rocksdb_options_set_use_spdb_writes(rocksdb_options_t* opt,
+                                                         unsigned char v) {
+  opt->rep.use_spdb_writes = v;
+}
+
 unsigned char rocksdb_options_get_allow_concurrent_memtable_write(
     rocksdb_options_t* opt) {
   return opt->rep.allow_concurrent_memtable_write;

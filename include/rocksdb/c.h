@@ -1476,6 +1476,9 @@ rocksdb_options_get_writable_file_max_buffer_size(rocksdb_options_t*);
 extern ROCKSDB_LIBRARY_API void
 rocksdb_options_set_allow_concurrent_memtable_write(rocksdb_options_t*,
                                                     unsigned char);
+extern ROCKSDB_LIBRARY_API void
+rocksdb_options_set_use_spdb_writes(rocksdb_options_t*,
+                                                    unsigned char);
 extern ROCKSDB_LIBRARY_API unsigned char
 rocksdb_options_get_allow_concurrent_memtable_write(rocksdb_options_t*);
 extern ROCKSDB_LIBRARY_API void
